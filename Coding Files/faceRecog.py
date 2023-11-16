@@ -1,66 +1,59 @@
-import cv2
 import face_recognition
-import pickle
 import os
-import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import db
-from firebase_admin import storage
+import numpy as np
+import PhotoCapturing as pc
 
-cred = credentials.Certificate("serviceAccountKey.json")
-firebase_admin.initialize_app(cred,{
-    'databaseURL': 'https://meetenhancer-default-rtdb.firebaseio.com/',
-    'storageBucket': "meetenhancer.appspot.com"
-})
+def encode_faces(image_path):
+    # Load the image
+    image = face_recognition.load_image_file(image_path)
 
+    # Find all face locations in the image
+    face_locations = face_recognition.face_locations(image)
 
+    # If no faces are found, return an empty list
+    if not face_locations:
+        return []
 
-# Importing the student images
+    # Encode the faces found in the image
+    face_encodings = face_recognition.face_encodings(image, face_locations)
 
-folderPath = 'Images'
-pathList = os.listdir(folderPath)
-# print(pathList)
-imgList = []
-studentIds = []
-for path in pathList:
-    imgList.append(cv2.imread(os.path.join(folderPath, path)))
-    # print(os.path.splitext(path)[0])
-    studentIds.append(os.path.splitext(path)[0])
+    return face_encodings
 
-    fileName = f'{folderPath}/{path}'
-    bucket = storage.bucket()
-    blob = bucket.blob(fileName)
-    blob.upload_from_filename(fileName)
+def save_encodings_to_file(face_encodings, output_file):
+    with open(output_file, 'w') as file:
+        for face_encoding in face_encodings:
+            # Convert the face encoding to a comma-separated string
+            encoding_str = ','.join(map(str, face_encoding))
+            file.write(encoding_str + '\n')
 
+def main():
+    root = pc.tk.Tk()
+    pc.PhotoDialog(root)
+    root.mainloop()
 
+    # Specify the path to the Images folder
+    images_folder = "Images"
 
-# print(studentIds)
+    # Specify the name of the image file
+    image_filename = "saved_photo.png"  # Replace with the actual image filename
 
-def findEncodings(imagesList):
-    encodeList = []
-    for img in imagesList:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        encode = face_recognition.face_encodings(img)[0]
-        encodeList.append(encode)
+    # Construct the full path to the image file
+    image_path = os.path.join(images_folder, image_filename)
 
-    return encodeList
+    # Check if the image file exists
+    if os.path.exists(image_path):
+        # Perform face encoding
+        face_encodings = encode_faces(image_path)
 
-print("Encoding Started...")
-encodeListKnown = findEncodings(imgList)
-encodeListKnownWithIds = [encodeListKnown, studentIds]
-# print(encodeListKnown)
-print("Encoding Complete")
+        if face_encodings:
+            # Save face encodings to a file
+            output_file = "encoded_faces.txt"
+            save_encodings_to_file(face_encodings, output_file)
+            print(f"Face encodings saved to '{output_file}'.")
+        else:
+            print("No faces found in the image.")
+    else:
+        print(f"The image file '{image_path}' does not exist.")
 
-file = open("EncodeFile.p", 'wb')
-pickle.dump(encodeListKnownWithIds, file)
-file.close()
-print("File Saved")
-
-print("Loading Encode File....")
-file = open('EncodeFile.p', 'rb')
-encodeListKnownWithIds = pickle.load(file)
-file.close()
-encodeListKnown, studentIds = encodeListKnownWithIds
-print("Encode File Loaded")
-
-
+if __name__ == "__main__":
+    main()
